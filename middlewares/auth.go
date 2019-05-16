@@ -16,16 +16,16 @@ var JwtAuthentication =  func (next http.Handler) http.Handler {
 	*	@params w : Http.ResponseWriter
 	*	@params r : Http.Request
 	*/
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		// List of endpoints that doesn't require auth
 		notAuth := []string{"/api/user/new", "/api/user/login"}
 		// Current request path
-		requestPath := r.URL.Path
+		requestPath := req.URL.Path
 		// Check if req doesn't need auth & serve it
 		for _, value := range notAuth {
 			if value == requestPath {
 				// w -> http.Writer r -> Http.Request
-				next.ServeHTTP(w, r)
+				next.ServeHTTP(res, req)
 				return
 			}
 		}
@@ -33,7 +33,7 @@ var JwtAuthentication =  func (next http.Handler) http.Handler {
 		// Init response map
 		response := make(map[string]interface{})
 		// Get token
-		tokenHeader := r.Header.Get("Authorization")
+		tokenHeader := req.Header.Get("Authorization")
 
 		// If token is empty
 		if tokenHeader == "" {
@@ -41,11 +41,11 @@ var JwtAuthentication =  func (next http.Handler) http.Handler {
 			response = u.Message(false, "Not a valid token")
 
 			// Set status 403 - Forbidden
-			w.WriteHeader(http.StatusForbidden)
+			res.WriteHeader(http.StatusForbidden)
 			// Set content-type in headers
-			w.Header().Add("Content-Type", "application/json")
+			res.Header().Add("Content-Type", "application/json")
 			// Send response w utils func
-			u.Respond(w, response)
+			u.Respond(res, response)
 			return
 		}
 
@@ -54,9 +54,9 @@ var JwtAuthentication =  func (next http.Handler) http.Handler {
 		// If token doesnt contains Bearer
 		if len(splitted) != 2 {
 			response = u.Message(false, "Invalid auth token")
-			w.WriteHeader(http.StatusForbidden)
-			w.Header().Add("Content-Type", "application/json")
-			u.Respond(w, response)
+			res.WriteHeader(http.StatusForbidden)
+			res.Header().Add("Content-Type", "application/json")
+			u.Respond(res, response)
 			return
 		}
 
@@ -66,31 +66,31 @@ var JwtAuthentication =  func (next http.Handler) http.Handler {
 
 		// Check server signing
 		token, err := jwt.ParseWithClaims(tokenPart, tk, func(token *jwt.Token) (interface{}, error) {
-			return []byte(os.Getenv("token_password")), nill
+			return []byte(os.Getenv("token_password")), nil
 		})
 
 		if err != nil {
 			response = u.Message(false, "Malformed token")
-			w.WriteHeader(http.StatusForbidden)
-			w.Header().Add("Content-Type", "application/json")
-			u.Respond(w, response )
+			res.WriteHeader(http.StatusForbidden)
+			res.Header().Add("Content-Type", "application/json")
+			u.Respond(res, response )
 			return
 		}
 
 		if !token.Valid {
 			response = u.Message(false, "Token not valid.")
-			w.WriteHeader(http.StatusForbidden)
-			w.Header().Add("Content-Type", "application/json")
-			u.Respond(w, response)
+			res.WriteHeader(http.StatusForbidden)
+			res.Header().Add("Content-Type", "application/json")
+			u.Respond(res, response)
 			return
 		}
 
 		// 200 OK
 		fmt.Sprintf("User %", tk.Username)
-		ctx := context.WithValue(r.Context(), "user", tk.UserId)
-		r = r.WithContext(ctx)
+		ctx := context.WithValue(req.Context(), "user", tk.UserId)
+		req = req.WithContext(ctx)
 		// Pass middleware
 			// w -> res, r -> req
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(res, req)
 	})
 }
